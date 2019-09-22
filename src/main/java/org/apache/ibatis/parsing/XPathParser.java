@@ -1,5 +1,5 @@
 /**
- *    Copyright 2009-2017 the original author or authors.
+ *    Copyright 2009-2019 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -41,13 +41,32 @@ import org.xml.sax.SAXParseException;
 
 /**
  * @author Clinton Begin
+ *
+ * mybatis xml解析类，
+ *
+ * 主要是构造器与evalXxx方法，
+ *
+ * 构造器有两步：
+ *    先调用commonConstructor()来初始化字段，再调用createDocument()来创建Document(将xml转为Document)
+ *
+ * evalXxx()方法基本使用：
+ *  private Object evaluate(String expression, Object root, QName returnType) {
+ *     try {
+ *       return xpath.evaluate(expression, root, returnType);
+ *     } catch (Exception e) {
+ *       throw new BuilderException("Error evaluating XPath.  Cause: " + e, e);
+ *     }
+ *   }
+ * ，它调用Xpath的evaluate方法(Object evaluate(String expression, Object item, QName returnType))
+ *   从Documen查找指定路径的节点或者属性，并转为相应类型(在调用时，会将this.document放置到Object item参数中)
+ *
  */
 public class XPathParser {
 
   private final Document document;
   private boolean validation;
-  private EntityResolver entityResolver;
-  private Properties variables;
+  private EntityResolver entityResolver;  //用于加载本地DTD文件
+  private Properties variables;  //mybatis-config.xml中的<properties>标签定义的键值对集合
   private XPath xpath;
 
   public XPathParser(String xml) {
@@ -139,8 +158,8 @@ public class XPathParser {
   }
 
   public String evalString(Object root, String expression) {
-    String result = (String) evaluate(expression, root, XPathConstants.STRING);
-    result = PropertyParser.parse(result, variables);
+    String result = (String) evaluate(expression, root, XPathConstants.STRING);  //找到节点值取出
+    result = PropertyParser.parse(result, variables);  //将Document找到的String用Properties值再次填值（${a.b}）。
     return result;
   }
 
@@ -228,6 +247,11 @@ public class XPathParser {
   private Document createDocument(InputSource inputSource) {
     // important: this must only be called AFTER common constructor
     try {
+      /**
+       * 创建DocumentBuilderFactory，并进行相应的配置，其中DocumentBuilderFactory是一个Abstract类，构造器私有
+       *
+       * newInstance内部使用FactoryFinder找到com.sun.org.apache.xerces.internal.jaxp.DocumentBuilderFactoryImpl
+       */
       DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
       factory.setValidating(validation);
 
@@ -237,6 +261,9 @@ public class XPathParser {
       factory.setCoalescing(false);
       factory.setExpandEntityReferences(true);
 
+      /**
+       * 2、用DocumentBuilderFactory生成DocumentBuilder，设置DocumentBuilder的EntityResolver(找本地DTD)与ErrorHandler(错误处理器).
+       */
       DocumentBuilder builder = factory.newDocumentBuilder();
       builder.setEntityResolver(entityResolver);
       builder.setErrorHandler(new ErrorHandler() {
@@ -254,6 +281,11 @@ public class XPathParser {
         public void warning(SAXParseException exception) throws SAXException {
         }
       });
+
+      /**
+       * 3、通过DocumentBuilder.parse()方法将xml转成Document，其中InputSource由构造器中的参数转换过来。
+       *  也就是要将哪一个xml转成Document是由构造器决定
+       */
       return builder.parse(inputSource);
     } catch (Exception e) {
       throw new BuilderException("Error creating document instance.  Cause: " + e, e);

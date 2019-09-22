@@ -1,5 +1,5 @@
 /**
- *    Copyright 2009-2016 the original author or authors.
+ *    Copyright 2009-2019 the original author or authors.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -26,6 +26,8 @@ import org.xml.sax.SAXException;
 
 /**
  * Offline entity resolver for the MyBatis DTDs
+ *
+ * 离线的DTD转为org.xml.sax.InputSource，防止连网下载
  * 
  * @author Clinton Begin
  * @author Eduardo Macarron
@@ -37,11 +39,13 @@ public class XMLMapperEntityResolver implements EntityResolver {
   private static final String MYBATIS_CONFIG_SYSTEM = "mybatis-3-config.dtd";
   private static final String MYBATIS_MAPPER_SYSTEM = "mybatis-3-mapper.dtd";
 
-  private static final String MYBATIS_CONFIG_DTD = "org/apache/ibatis/builder/xml/mybatis-3-config.dtd";
+  private static final String MYBATIS_CONFIG_DTD = "org/apache/ibatis/builder/xml/mybatis-3-config.dtd";  //在包中放置了相应的dtd
   private static final String MYBATIS_MAPPER_DTD = "org/apache/ibatis/builder/xml/mybatis-3-mapper.dtd";
 
   /*
    * Converts a public DTD into a local one
+   *
+   * 将一个public dtd转为本地
    * 
    * @param publicId The public id that is what comes after "PUBLIC"
    * @param systemId The system id that is what comes after the public id.
@@ -55,9 +59,9 @@ public class XMLMapperEntityResolver implements EntityResolver {
       if (systemId != null) {
         String lowerCaseSystemId = systemId.toLowerCase(Locale.ENGLISH);
         if (lowerCaseSystemId.contains(MYBATIS_CONFIG_SYSTEM) || lowerCaseSystemId.contains(IBATIS_CONFIG_SYSTEM)) {
-          return getInputSource(MYBATIS_CONFIG_DTD, publicId, systemId);
+          return getInputSource(MYBATIS_CONFIG_DTD, publicId, systemId);  //config dtd
         } else if (lowerCaseSystemId.contains(MYBATIS_MAPPER_SYSTEM) || lowerCaseSystemId.contains(IBATIS_MAPPER_SYSTEM)) {
-          return getInputSource(MYBATIS_MAPPER_DTD, publicId, systemId);
+          return getInputSource(MYBATIS_MAPPER_DTD, publicId, systemId); //mapper dtd
         }
       }
       return null;
@@ -66,6 +70,10 @@ public class XMLMapperEntityResolver implements EntityResolver {
     }
   }
 
+  /**
+   * 将path转为Inputstream ==> InputSource，
+   * 同时将publicId与systemId设置到InputSource中
+   */
   private InputSource getInputSource(String path, String publicId, String systemId) {
     InputSource source = null;
     if (path != null) {
