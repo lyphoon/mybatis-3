@@ -34,8 +34,8 @@ public class XNode {
   private final Node node;
   private final String name;
   private final String body;
-  private final Properties attributes;
-  private final Properties variables;
+  private final Properties attributes;  //节点属性集合
+  private final Properties variables;   //config中的properties节点下的内容
   private final XPathParser xpathParser;
 
   public XNode(XPathParser xpathParser, Node node, Properties variables) {

@@ -57,7 +57,7 @@ public class PropertyParser {
   }
 
   public static String parse(String string, Properties variables) {
-    VariableTokenHandler handler = new VariableTokenHandler(variables);
+    VariableTokenHandler handler = new VariableTokenHandler(variables);  //参数处理
     GenericTokenParser parser = new GenericTokenParser("${", "}", handler);
     return parser.parse(string);
   }
@@ -74,7 +74,7 @@ public class PropertyParser {
     }
 
     private String getPropertyValue(String key, String defaultValue) {
-      return (variables == null) ? defaultValue : variables.getProperty(key, defaultValue);
+      return (variables == null) ? defaultValue : variables.getProperty(key, defaultValue);  //variables为空取默认值，否则取属性值
     }
 
     @Override

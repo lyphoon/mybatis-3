@@ -233,12 +233,12 @@ public class XPathParser {
     if (node == null) {
       return null;
     }
-    return new XNode(this, node, variables);
+    return new XNode(this, node, variables);  //将XPathParser本身传入
   }
 
   private Object evaluate(String expression, Object root, QName returnType) {
     try {
-      return xpath.evaluate(expression, root, returnType);
+      return xpath.evaluate(expression, root, returnType);  //Xpath.evaluate
     } catch (Exception e) {
       throw new BuilderException("Error evaluating XPath.  Cause: " + e, e);
     }
