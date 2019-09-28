@@ -28,6 +28,10 @@ import org.xml.sax.SAXException;
  * Offline entity resolver for the MyBatis DTDs
  *
  * 离线的DTD转为org.xml.sax.InputSource，防止连网下载
+ *
+ * 根据publidId与systemId找到对应的dtd，并加载为InputSource(输入源)
+ *
+ * public abstract InputSource resolveEntity (String publicId, String systemId)
  * 
  * @author Clinton Begin
  * @author Eduardo Macarron
@@ -78,7 +82,7 @@ public class XMLMapperEntityResolver implements EntityResolver {
     InputSource source = null;
     if (path != null) {
       try {
-        InputStream in = Resources.getResourceAsStream(path);
+        InputStream in = Resources.getResourceAsStream(path);  //内部将path（dtd对应的class path）通过ClassLoader转为InputStream,
         source = new InputSource(in);
         source.setPublicId(publicId);
         source.setSystemId(systemId);        

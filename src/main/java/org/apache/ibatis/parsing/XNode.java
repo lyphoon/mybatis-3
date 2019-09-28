@@ -28,6 +28,8 @@ import org.w3c.dom.NodeList;
 
 /**
  * @author Clinton Begin
+ *
+ * Node的封装类
  */
 public class XNode {
 
@@ -36,7 +38,7 @@ public class XNode {
   private final String body;
   private final Properties attributes;  //节点属性集合
   private final Properties variables;   //config中的properties节点下的内容
-  private final XPathParser xpathParser;
+  private final XPathParser xpathParser;  //XNode由谁产生
 
   public XNode(XPathParser xpathParser, Node node, Properties variables) {
     this.xpathParser = xpathParser;
@@ -347,19 +349,26 @@ public class XNode {
     return builder.toString();
   }
 
+  /**
+   * 获取节点中的属性集合，对应的每一个值已经处理了占位符
+   */
   private Properties parseAttributes(Node n) {
     Properties attributes = new Properties();
     NamedNodeMap attributeNodes = n.getAttributes();
     if (attributeNodes != null) {
       for (int i = 0; i < attributeNodes.getLength(); i++) {
         Node attribute = attributeNodes.item(i);
-        String value = PropertyParser.parse(attribute.getNodeValue(), variables);
+        String value = PropertyParser.parse(attribute.getNodeValue(), variables);  //属性处理器，处理节点值中的占位符
         attributes.put(attribute.getNodeName(), value);
       }
     }
     return attributes;
   }
 
+  /**
+   * 获取节点中的body（文本节点）
+   *
+   */
   private String parseBody(Node node) {
     String data = getBodyData(node);
     if (data == null) {
@@ -367,7 +376,7 @@ public class XNode {
       for (int i = 0; i < children.getLength(); i++) {
         Node child = children.item(i);
         data = getBodyData(child);
-        if (data != null) {
+        if (data != null) {  //第一个子文本节点的文本内容
           break;
         }
       }
@@ -375,9 +384,12 @@ public class XNode {
     return data;
   }
 
+  /**
+   * 文本Node节点的文本，进行占位符处理(PropertyParser.parse)
+   */
   private String getBodyData(Node child) {
     if (child.getNodeType() == Node.CDATA_SECTION_NODE
-        || child.getNodeType() == Node.TEXT_NODE) {
+        || child.getNodeType() == Node.TEXT_NODE) {  //文本节点或者![CDATA[ ]节点
       String data = ((CharacterData) child).getData();
       data = PropertyParser.parse(data, variables);
       return data;

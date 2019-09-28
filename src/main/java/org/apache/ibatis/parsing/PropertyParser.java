@@ -21,7 +21,7 @@ import java.util.Properties;
  * @author Clinton Begin
  * @author Kazuki Shimizu
  *
- * 属性解析器
+ * 属性解析器，静态工具类，构造器为private
  */
 public class PropertyParser {
 
@@ -49,27 +49,38 @@ public class PropertyParser {
    */
   public static final String KEY_DEFAULT_VALUE_SEPARATOR = KEY_PREFIX + "default-value-separator";
 
-  private static final String ENABLE_DEFAULT_VALUE = "false";
-  private static final String DEFAULT_VALUE_SEPARATOR = ":";
+  private static final String ENABLE_DEFAULT_VALUE = "false";  //是否开启默认值功能
+  private static final String DEFAULT_VALUE_SEPARATOR = ":";  //默认值的分隔符${db.username:postgres}，如果properties中没有db.useername，使用postgres为它的值
 
   private PropertyParser() {
-    // Prevent Instantiation
+    // Prevent Instantiation, 私有构造器，防止实例化
   }
 
+  /**
+   * 唯一主方法，将string中的占位符用Properties中的属性替换
+   */
   public static String parse(String string, Properties variables) {
-    VariableTokenHandler handler = new VariableTokenHandler(variables);  //参数处理
+    VariableTokenHandler handler = new VariableTokenHandler(variables);
     GenericTokenParser parser = new GenericTokenParser("${", "}", handler);
     return parser.parse(string);
   }
 
+
+  /**
+   * 静态内部类，处理变量标记，如果开启默认值 varaible.get(xxx, defalutValue), 否则使用variable.get(xxx)，没有给一个${content}
+   *
+   * 主要是对一个占位符String（String都是占位符中的内容，${}或者#{}中的值）进行处理
+   *
+   * ==> 一个变量占位符处理
+   */
   private static class VariableTokenHandler implements TokenHandler {
-    private final Properties variables;
-    private final boolean enableDefaultValue;
-    private final String defaultValueSeparator;
+    private final Properties variables;  //Properties extends Hashtable<Object,Object>
+    private final boolean enableDefaultValue;  //是否开启默认值
+    private final String defaultValueSeparator;  //占位符中默认值的分隔符
 
     private VariableTokenHandler(Properties variables) {
       this.variables = variables;
-      this.enableDefaultValue = Boolean.parseBoolean(getPropertyValue(KEY_ENABLE_DEFAULT_VALUE, ENABLE_DEFAULT_VALUE));
+      this.enableDefaultValue = Boolean.parseBoolean(getPropertyValue(KEY_ENABLE_DEFAULT_VALUE, ENABLE_DEFAULT_VALUE));  //Properties中都是String, 要进行类型转换
       this.defaultValueSeparator = getPropertyValue(KEY_DEFAULT_VALUE_SEPARATOR, DEFAULT_VALUE_SEPARATOR);
     }
 
@@ -77,6 +88,9 @@ public class PropertyParser {
       return (variables == null) ? defaultValue : variables.getProperty(key, defaultValue);  //variables为空取默认值，否则取属性值
     }
 
+    /**
+     * TokenHandler接口中的方法，处理标志
+     */
     @Override
     public String handleToken(String content) {
       if (variables != null) {
@@ -89,10 +103,10 @@ public class PropertyParser {
             defaultValue = content.substring(separatorIndex + defaultValueSeparator.length());
           }
           if (defaultValue != null) {
-            return variables.getProperty(key, defaultValue);
+            return variables.getProperty(key, defaultValue);  //从vairable中取key,没有则为默认值
           }
         }
-        if (variables.containsKey(key)) {
+        if (variables.containsKey(key)) {  //variables中含有key值
           return variables.getProperty(key);
         }
       }

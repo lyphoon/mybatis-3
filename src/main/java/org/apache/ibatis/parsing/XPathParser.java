@@ -47,7 +47,7 @@ import org.xml.sax.SAXParseException;
  * 主要是构造器与evalXxx方法，
  *
  * 构造器有两步：
- *    先调用commonConstructor()来初始化字段，再调用createDocument()来创建Document(将xml转为Document)
+ *    先调用commonConstructor()来初始化字段(都是false, null)，再调用createDocument(InputSource inputSource)来创建Document(将xml转为Document)
  *
  * evalXxx()方法基本使用：
  *  private Object evaluate(String expression, Object root, QName returnType) {
@@ -58,18 +58,18 @@ import org.xml.sax.SAXParseException;
  *     }
  *   }
  * ，它调用Xpath的evaluate方法(Object evaluate(String expression, Object item, QName returnType))
- *   从Documen查找指定路径的节点或者属性，并转为相应类型(在调用时，会将this.document放置到Object item参数中)
+ *   从Documen(item)查找指定路径的节点或者属性(expression)，并转为相应类型(在调用时，会将this.document放置到Object item参数中)
  *
  */
 public class XPathParser {
 
-  private final Document document;
-  private boolean validation;
-  private EntityResolver entityResolver;  //用于加载本地DTD文件
-  private Properties variables;  //mybatis-config.xml中的<properties>标签定义的键值对集合
+  private final Document document;  //Document
+  private boolean validation;  //是否开启检验
+  private EntityResolver entityResolver;  //用于加载本地DTD文件， 它在builder模块下有mapper与config的xml对应的dtd
+  private Properties variables;  //mybatis-config.xml中的<properties>标签定义的键值对集合, Properties extends Hashtable<Object,Object>, 键值都为string
   private XPath xpath;
 
-  public XPathParser(String xml) {
+  public XPathParser(String xml) {  //xml为xml的全文，并不是路径
     commonConstructor(false, null, null);
     this.document = createDocument(new InputSource(new StringReader(xml)));
   }
@@ -159,10 +159,14 @@ public class XPathParser {
 
   public String evalString(Object root, String expression) {
     String result = (String) evaluate(expression, root, XPathConstants.STRING);  //找到节点值取出
-    result = PropertyParser.parse(result, variables);  //将Document找到的String用Properties值再次填值（${a.b}）。
+    result = PropertyParser.parse(result, variables);  //属性解析器，result中的占位符在Properties中查找并替换
     return result;
   }
 
+  /**
+   * evaluate(expression, root, XPathConstants.BOOLEAN)
+   * ==> 上下文为当前类的document, 也就是整个document中查找对应的表达式对应的值，将值转为Boolean
+   */
   public Boolean evalBoolean(String expression) {
     return evalBoolean(document, expression);
   }
