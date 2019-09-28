@@ -24,13 +24,30 @@ import org.slf4j.spi.LocationAwareLogger;
 /**
  * @author Clinton Begin
  * @author Eduardo Macarron
+ *
+ * 它不是正常的适配器模式!!
+ *
+ *
+ *
+ * 使用适配器设计模式，它是Slf4j log的适配器，它持有被适配的对象Log(Slf4j日志对象)
+ * 在构造器中，构造相应的被适配对象
  */
 public class Slf4jImpl implements Log {
 
-  private Log log;
+  private Log log;  //mybatis的Log接口
 
+  /**
+   * slf4j 1.6之前与之后的Logger是使用了不同的接口。对于不同版本的sl4j，都有一个相应的适配器对象，
+   * Slf4jLocationAwareLoggerImpl为1.6版本之后的适配器，Slf4jLoggerImpl为1.6之前的适配器。
+   *
+   * 判断版本，找到相应的适配器，因为适配器本身都实现同一个接口Log(多态)，将不同的版本对应的适配器给Log log并持有，
+   * 在本类中，Log接口的所有方法，都是使用这个log实现。
+   *
+   * 其实不同版本的适配器，内部也会持有被适配的对象，这里是Logger logger（通过构造器传入），
+   * 这样，Log所有方法，都会调用logger的方法，因为不同版本的适配器都是通过logger实现Log接口
+   */
   public Slf4jImpl(String clazz) {
-    Logger logger = LoggerFactory.getLogger(clazz);
+    Logger logger = LoggerFactory.getLogger(clazz);  //sl4j
 
     if (logger instanceof LocationAwareLogger) {
       try {

@@ -26,6 +26,9 @@ public class MethodInvoker implements Invoker {
   private final Class<?> type;
   private final Method method;
 
+  /**
+   * MethodInvoker 对get封装了返回类型，对set封装了参数类型
+   */
   public MethodInvoker(Method method) {
     this.method = method;
 

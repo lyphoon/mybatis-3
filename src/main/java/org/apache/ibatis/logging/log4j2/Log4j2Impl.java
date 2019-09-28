@@ -22,6 +22,8 @@ import org.apache.logging.log4j.spi.AbstractLogger;
 
 /**
  * @author Eduardo Macarron
+ *
+ * 它也不是正常的适配器，内部有两个适配器对象
  */
 public class Log4j2Impl implements Log {
 
