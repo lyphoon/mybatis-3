@@ -36,6 +36,14 @@ public class RichType {
     }
   };
 
+  private List<Employee> employeeList2 = new ArrayList<>();
+
+  private List<Employee> employeeList3 = new ArrayList(){
+    {
+      new Employee();
+    }
+  };
+
   public RichType getRichType() {
     return richType;
   }

@@ -48,6 +48,9 @@ public class MetaClass {
     return MetaClass.forClass(propType, reflectorFactory);
   }
 
+  /**
+   * 查找一个类是否有属性User类中的Tel.nUm->tel.num，它不支持找带有'.'号的
+   */
   public String findProperty(String name) {
     StringBuilder prop = buildProperty(name, new StringBuilder());
     return prop.length() > 0 ? prop.toString() : null;
@@ -89,7 +92,7 @@ public class MetaClass {
   }
 
   private MetaClass metaClassForProperty(PropertyTokenizer prop) {
-    Class<?> propType = getGetterType(prop);
+    Class<?> propType = getGetterType(prop);  //List<A> -> A的类型
     return MetaClass.forClass(propType, reflectorFactory);
   }
 
@@ -146,17 +149,20 @@ public class MetaClass {
     }
   }
 
+  /**
+   * richType.richList[0]
+   */
   public boolean hasGetter(String name) {
     PropertyTokenizer prop = new PropertyTokenizer(name);
     if (prop.hasNext()) {
-      if (reflector.hasGetter(prop.getName())) {
-        MetaClass metaProp = metaClassForProperty(prop);
-        return metaProp.hasGetter(prop.getChildren());
+      if (reflector.hasGetter(prop.getName())) {  //richType
+        MetaClass metaProp = metaClassForProperty(prop);  //richList
+        return metaProp.hasGetter(prop.getChildren());  //richList[0]
       } else {
         return false;
       }
     } else {
-      return reflector.hasGetter(prop.getName());
+      return reflector.hasGetter(prop.getName()); //getName，不包括index
     }
   }
 
@@ -175,7 +181,7 @@ public class MetaClass {
       if (propertyName != null) {
         builder.append(propertyName);
         builder.append(".");
-        MetaClass metaProp = metaClassForProperty(propertyName);
+        MetaClass metaProp = metaClassForProperty(propertyName);  //再次构造一个返回值类型的Reflector
         metaProp.buildProperty(prop.getChildren(), builder);
       }
     } else {
