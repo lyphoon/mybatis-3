@@ -42,25 +42,32 @@ import org.apache.ibatis.reflection.property.PropertyNamer;
  * This class represents a cached set of class definition information that
  * allows for easy mapping between property names and getter/setter methods.
  *
+ * 它是一个class定义信息的缓存，让属性名与getter/setter方法之间的映射理方便
+ *
+ * 反射类，缓存一个类的属性信息，方便到时候的反射
+ *
  * @author Clinton Begin
  */
 public class Reflector {
 
-  private final Class<?> type;
+  private final Class<?> type;  //反射对应的类，每一个类胡一个Reflector
 
   private final String[] readablePropertyNames;  //可读属性名称
   private final String[] writeablePropertyNames;  //可写属性名称
 
-  private final Map<String, Invoker> setMethods = new HashMap<String, Invoker>();
-  private final Map<String, Invoker> getMethods = new HashMap<String, Invoker>();
+  private final Map<String, Invoker> setMethods = new HashMap<String, Invoker>();  //读属性->Invoker(MethodInvoker, GetFieldInvoker)
+  private final Map<String, Invoker> getMethods = new HashMap<String, Invoker>();  //写属性->Invoker(MethodInvoker, SetFieldInvoker)
 
-  private final Map<String, Class<?>> setTypes = new HashMap<String, Class<?>>();
-  private final Map<String, Class<?>> getTypes = new HashMap<String, Class<?>>();
+  private final Map<String, Class<?>> setTypes = new HashMap<String, Class<?>>();   //set时的参数类型
+  private final Map<String, Class<?>> getTypes = new HashMap<String, Class<?>>();   //get时的返回值类型
 
-  private Constructor<?> defaultConstructor;
+  private Constructor<?> defaultConstructor;  //默认的无参构造器
 
   private Map<String, String> caseInsensitivePropertyMap = new HashMap<String, String>();
 
+  /**
+   * 主要使用它来生成一个类对应的Reflector
+   */
   public Reflector(Class<?> clazz) {
     type = clazz;
     addDefaultConstructor(clazz);  //无参构造器
@@ -102,6 +109,11 @@ public class Reflector {
     }
   }
 
+  /**
+   * 1、getClassMethods()获取一个类的所有方法，包括了所有继承中的类中的方法包括私有方法(判断是否为同一个方法是通过为方法生成一个签名)
+   * 2、addMethodConflict()将属性名相同的方法的映射放置在冲突的ap<String, List<Method>> conflictingGetters中
+   * 3、resolveGetterConflicts() 解决冲突，它先解决一个属性对应多个Method的情况(从List<Method>中选择一个)，之后通过addGetMethod将方法放置在getMethods与getTypes中
+   */
   private void addGetMethods(Class<?> cls) {
     Map<String, List<Method>> conflictingGetters = new HashMap<String, List<Method>>();  //一个属性名对应多个的原因是子类重写了父类的返回值
     Method[] methods = getClassMethods(cls);  //所有的方法
@@ -122,7 +134,10 @@ public class Reflector {
 
   /**
    * 解决Getter方法中冲突问题，一个属性名对应多个get方法
-   * @param conflictingGetters
+   *
+   * 对于get，它的方法签名只有返回值类型#方法名，方法名相同时只能是返回值类型不同
+   *
+   * 解决Get方法的冲突问题，返回类型不同时，取更具体的返回类型
    */
   private void resolveGetterConflicts(Map<String, List<Method>> conflictingGetters) {
     for (Entry<String, List<Method>> entry : conflictingGetters.entrySet()) {
@@ -130,7 +145,7 @@ public class Reflector {
       String propName = entry.getKey();
 
       /**
-       * 解决一个属性名
+       * 一次解决一个属性名
        */
       for (Method candidate : entry.getValue()) {
         if (winner == null) {
@@ -166,10 +181,13 @@ public class Reflector {
       }
 
 
-      addGetMethod(propName, winner);
+      addGetMethod(propName, winner);  //get方法对应的属性名放置在getMethods中与getTypes中
     }
   }
 
+  /**
+   * get方法对应的属性名放置在getMethods中与getTypes中
+   */
   private void addGetMethod(String name, Method method) {
     if (isValidPropertyName(name)) {
       getMethods.put(name, new MethodInvoker(method));  //MethodInvoker 对get封装了返回类型，对set封装了参数类型
@@ -206,8 +224,6 @@ public class Reflector {
   }
 
   /**
-   *
-   *
    *
    */
   private void resolveSetterConflicts(Map<String, List<Method>> conflictingSetters) {
@@ -339,13 +355,13 @@ public class Reflector {
     return !(name.startsWith("$") || "serialVersionUID".equals(name) || "class".equals(name));
   }
 
-  /*
+  /**
    * This method returns an array containing all methods
    * declared in this class and any superclass.
    * We use this method, instead of the simpler Class.getMethods(),
    * because we want to look for private methods as well.
    *
-   * 获取所有的自己和继承的所有方法
+   * 获取所有的自己和继承的所有方法，注意加载时的顺序，它有优先级，在前面的优先加载
    *
    * @param cls The class
    * @return An array containing all methods in this class
@@ -377,16 +393,16 @@ public class Reflector {
         addUniqueMethods(uniqueMethods, anInterface.getMethods());
       }
 
-      currentClass = currentClass.getSuperclass();
+      currentClass = currentClass.getSuperclass();  //父类
     }
 
     Collection<Method> methods = uniqueMethods.values();
 
-    return methods.toArray(new Method[methods.size()]);
+    return methods.toArray(new Method[methods.size()]);  // T[] a, a为要存储Collection的数组，它要足够大，能够放下所有Collection元素
   }
 
   /**
-   * 对每个Method，生成签名。将签名作为key,存入Map中。在此过程中会设置私有方法的访问性
+   * 对每个Method，生成签名。将签名作为key,存入Map uniqueMethods中。在此过程中会设置私有方法的访问性
    */
   private void addUniqueMethods(Map<String, Method> uniqueMethods, Method[] methods) {
     for (Method currentMethod : methods) {
@@ -395,7 +411,7 @@ public class Reflector {
        *   就是说一个子类在继承（或实现）一个父类（或接口）的泛型方法时，在子类中明确指定了泛型类型，
        *   那么在编译时编译器会自动生成桥接方法（当然还有其他情况会生成桥接方法，这里只是列举了其中一种情况）
        */
-      if (!currentMethod.isBridge()) {
+      if (!currentMethod.isBridge()) {  //桥接方法是 JDK 1.5 引入泛型后，为了使Java的泛型方法生成的字节码和 1.5 版本前的字节码相兼容，由编译器自动生成的方法。
         String signature = getSignature(currentMethod);
         // check to see if the method is already known
         // if it is known, then an extended class must have
@@ -417,7 +433,7 @@ public class Reflector {
 
   /**
    * 获取方法签名：
-   *  返回类型名#方法名:参数1类型,参数2类型
+   *  返回类型名#方法名:参数1类型,参数2类型,...
    */
   private String getSignature(Method method) {
     StringBuilder sb = new StringBuilder();
@@ -439,7 +455,7 @@ public class Reflector {
   }
 
   /**
-   * 是否允许通过反射访问私有方法
+   * 是否有反射的权限，在类外访问私有函数只能通过反射
    */
   private static boolean canAccessPrivateMethods() {
     try {
