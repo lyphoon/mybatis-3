@@ -300,7 +300,7 @@ public class Reflector {
       }
     }
     if (result == null) {
-      result = Object.class;
+      result = Object.class;  //TypeVariable(T a)  ==> class为Object.class
     }
     return result;
   }

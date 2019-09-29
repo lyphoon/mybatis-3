@@ -78,23 +78,49 @@ public class TypeParameterResolver {
     }
   }
 
+  /**
+   * 解析GenericArrayType，它内部特别的方法只有一个(数组元素)：
+   *    Type getGenericComponentType();
+   *
+   * 解析GenericArrayType目标：就是要设置它的genericComponentType
+   *
+   * 到了这个地方，它的数组元素类型不可能是Class，如果是Class在resolveType()时对应的类型就是一个Class，已经直接返回了
+   *
+   *
+   * 如果是TypeVariable(T[])，要将它转为具体的Object.class(如果最后解析出来T不是Parameterized也不是Class，就是T本身，设置为Object), String.class之类的;
+   * 如果是GeneriacArrayType(T[][])==>如果T没有解析出来，它是Object.class
+   * 如果是ParameterizedType ==> 类型还是ParameterizedType
+   */
   private static Type resolveGenericArrayType(GenericArrayType genericArrayType, Type srcType, Class<?> declaringClass) {
     Type componentType = genericArrayType.getGenericComponentType();
     Type resolvedComponentType = null;
-    if (componentType instanceof TypeVariable) {
+
+
+    if (componentType instanceof TypeVariable) {  //数组元素是一个TypeVarialbe, 解析它
       resolvedComponentType = resolveTypeVar((TypeVariable<?>) componentType, srcType, declaringClass);
-    } else if (componentType instanceof GenericArrayType) {
+    } else if (componentType instanceof GenericArrayType) { //数组元素是一个GenericArrayType
       resolvedComponentType = resolveGenericArrayType((GenericArrayType) componentType, srcType, declaringClass);
-    } else if (componentType instanceof ParameterizedType) {
+    } else if (componentType instanceof ParameterizedType) { //数组元素是一个ParamterizedType
       resolvedComponentType = resolveParameterizedType((ParameterizedType) componentType, srcType, declaringClass);
     }
-    if (resolvedComponentType instanceof Class) {
+
+    if (resolvedComponentType instanceof Class) {  //解析出来的数组元素是一个Class，返回类型是Array对应的class 数组为一个Class
       return Array.newInstance((Class<?>) resolvedComponentType, 0).getClass();
     } else {
       return new GenericArrayTypeImpl(resolvedComponentType);
     }
   }
 
+  /**
+   * 解析ParameterizedType：
+   *  Type[] getActualTypeArguments();
+   *
+   *  Type getRawType();
+   *
+   *  Type getOwnerType();
+   *
+   * 其中getActualTypeArguments要再次解析
+   */
   private static ParameterizedType resolveParameterizedType(ParameterizedType parameterizedType, Type srcType, Class<?> declaringClass) {
     Class<?> rawType = (Class<?>) parameterizedType.getRawType();
     Type[] typeArgs = parameterizedType.getActualTypeArguments();
@@ -113,6 +139,14 @@ public class TypeParameterResolver {
     return new ParameterizedTypeImpl(rawType, null, args);
   }
 
+  /**
+   * 解析WildcardType：
+   *    Type[] getUpperBounds();
+   *
+   *    Type[] getLowerBounds();
+   *
+   * 先取出上下边界的Type, 对其中每一个边界的Type按照类型进行解析
+   */
   private static Type resolveWildcardType(WildcardType wildcardType, Type srcType, Class<?> declaringClass) {
     Type[] lowerBounds = resolveWildcardTypeBounds(wildcardType.getLowerBounds(), srcType, declaringClass);
     Type[] upperBounds = resolveWildcardTypeBounds(wildcardType.getUpperBounds(), srcType, declaringClass);
@@ -135,6 +169,11 @@ public class TypeParameterResolver {
     return result;
   }
 
+  /**
+   * 解析TypeVariable，它是核心，其它的都要引用它进行解析，不管是GenericArrayType,ParameterizedType还是WildcardType
+   *
+   * T变量它只可能在两个地方声明Class或者ParameterizedType
+   */
   private static Type resolveTypeVar(TypeVariable<?> typeVar, Type srcType, Class<?> declaringClass) {
     Type result = null;
     Class<?> clazz = null;
@@ -171,42 +210,67 @@ public class TypeParameterResolver {
     return Object.class;
   }
 
+  /**
+   * interface Level1Mapper<E, F> extends Level0Mapper<E, F, String>: clazz->Level1Mapper, superClass->Level0Mapper<E, F, String>
+   * interface Level0Mapper<L, M, N>   : declaringClass
+   *
+   * 测试方法：TypeParameterResolverTest.testReturn_Lv1Array_M
+   */
   private static Type scanSuperTypes(TypeVariable<?> typeVar, Type srcType, Class<?> declaringClass, Class<?> clazz, Type superclass) {
     Type result = null;
     if (superclass instanceof ParameterizedType) {
       ParameterizedType parentAsType = (ParameterizedType) superclass;
       Class<?> parentAsClass = (Class<?>) parentAsType.getRawType();
       if (declaringClass == parentAsClass) {
-        Type[] typeArgs = parentAsType.getActualTypeArguments();
-        TypeVariable<?>[] declaredTypeVars = declaringClass.getTypeParameters();
-        for (int i = 0; i < declaredTypeVars.length; i++) {
-          if (declaredTypeVars[i] == typeVar) {
+        Type[] typeArgs = parentAsType.getActualTypeArguments(); //E, F, String; T,T
+        TypeVariable<?>[] declaredTypeVars = declaringClass.getTypeParameters();  //L,M,N ; K,V
+        for (int i = 0; i < declaredTypeVars.length; i++) { //L,M,N，它的下标与E/F/String相同
+          if (declaredTypeVars[i] == typeVar) {  //L,M,N, 如M[]
             if (typeArgs[i] instanceof TypeVariable) {
-              TypeVariable<?>[] typeParams = clazz.getTypeParameters();
+              TypeVariable<?>[] typeParams = clazz.getTypeParameters();  //E, F; T
               for (int j = 0; j < typeParams.length; j++) {
-                if (typeParams[j] == typeArgs[i]) {
-                  if (srcType instanceof ParameterizedType) {
+                if (typeParams[j] == typeArgs[i]) {  //E, F -> E,F,String; T -> T
+                  if (srcType instanceof ParameterizedType) {  //当前srcType都是类，传入的时候是用的Class, SubClass<Long> a 可以
+                    /**
+                     * ClassA<K, V>{
+                     *    Map<K, V> map
+                     * }
+                     *
+                     * SubClassA<T> extends ClassA<K, V>{...}
+                     *
+                     * TestClass {
+                     *     SubClassA<Long> a = new SubClass<>();
+                     * }
+                     *
+                     * 这时srcType就是一个ParameteriazedType
+                     *
+                     * declaringClass: ClassA<K,V>, superClass: ClassA<K, K>, srcType:SubClassA<Long>, clazz:SubClassA<T>
+                     *     typeVar为K/M
+                     */
                     result = ((ParameterizedType) srcType).getActualTypeArguments()[j];
                   }
                   break;
                 }
               }
-            } else {
+            } else {  //Level0Mapper中使用N(String)
               result = typeArgs[i];
             }
           }
         }
-      } else if (declaringClass.isAssignableFrom(parentAsClass)) {
+      } else if (declaringClass.isAssignableFrom(parentAsClass)) {  // A extends B extends C, C为declaringClass, B为当前的parnetAsClass。只是当前B为泛型类
         result = resolveTypeVar(typeVar, parentAsType, declaringClass);
       }
     } else if (superclass instanceof Class) {
-      if (declaringClass.isAssignableFrom((Class<?>) superclass)) {
+      if (declaringClass.isAssignableFrom((Class<?>) superclass)) {  //A extends B extends C, C为declaringClass, B为当前的superclass。B当前不为泛型
         result = resolveTypeVar(typeVar, superclass, declaringClass);
       }
     }
     return result;
   }
 
+  /**
+   * 以下为Type类型的内部类
+   */
   private TypeParameterResolver() {
     super();
   }

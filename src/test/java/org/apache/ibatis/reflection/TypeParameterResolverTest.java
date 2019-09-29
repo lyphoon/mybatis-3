@@ -158,6 +158,7 @@ public class TypeParameterResolverTest {
     assertEquals(String.class, paramType.getActualTypeArguments()[0]);
   }
 
+
   @Test
   public void testReturn_Lv2CustomClassList() throws Exception {
     Class<?> clazz = Level2Mapper.class;
@@ -209,6 +210,16 @@ public class TypeParameterResolverTest {
     Class<?> resultClass = (Class<?>) result;
     assertTrue(resultClass.isArray());
     assertEquals(String.class, resultClass.getComponentType());
+  }
+
+  @Test
+  public void testReturn_Lv1Array_M() throws Exception {
+    Class<?> clazz = Level1Mapper.class;
+    Method method = clazz.getMethod("selectArrayM", null);
+    Type result = TypeParameterResolver.resolveReturnType(method, clazz);
+    assertTrue(result instanceof Class);
+    Class<?> resultClass = (Class<?>) result;
+    assertTrue(resultClass.isArray());
   }
 
   @Test
