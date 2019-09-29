@@ -272,7 +272,7 @@ public class TypeParameterResolver {
    * 以下为Type类型的内部类
    */
   private TypeParameterResolver() {
-    super();
+    super();  //私有构造器==>防止实例化
   }
 
   static class ParameterizedTypeImpl implements ParameterizedType {
